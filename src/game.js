@@ -20,6 +20,7 @@ import uvScroll from "./uv-scroll";
 import idleEyes from "./idle-eyes";
 import assets from "./assets";
 import debugConfig from "./debug-config";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter";
 
 // Used to test mesh combination
 window.combineCurrentAvatar = async function () {
@@ -226,6 +227,20 @@ function applyMorphRelationships(part) {
   }
 }
 
+async function uploadGLTFModel({ category, part, group, cached = true }) {
+  try {
+    const load = cached ? loadGLTFCached : loadGLTF;
+    const gltf =  load(urlFor(part));
+    return {
+      gltf,
+      part,
+      category
+    };
+  } catch {
+    console.error(`Filed to upload gltf. part: ${part}; category: ${category}`);
+  }
+}
+
 async function loadIntoGroup({ category, part, group, cached = true }) {
   try {
     const load = cached ? loadGLTFCached : loadGLTF;
@@ -302,6 +317,28 @@ function tick(time) {
                 state.shouldApplyMorphRelationships = true;
               }
             );
+            uploadGLTFModel({ category, part: state.newAvatarConfig[category], group: state.avatarNodes[category] }).then(({gltf, part, category}) => {
+              const data = new FormData();
+              const exporter = new GLTFExporter();
+              exporter.parse(
+                gltf.scene,
+                function ( gltf ) {
+                  const gltfFile = new Blob([gltf])
+                  data.append('avatar', gltfFile);
+                  console.log('data:', data);
+                },
+                {
+                  onlyVisible: false,
+                  binary: true
+                }
+              );
+              // fetch("http://localhost:3000/uploadGLTF", {
+              //     method: 'POST',
+              //     body: data
+              // }).then((res) => {
+              //   console.log('res:', res);
+              // })
+            })
           } else {
             state.avatarNodes[category].clear();
             state.shouldApplyMorphRelationships = true;
